@@ -38,20 +38,21 @@ class Attention(nn.Module):
 
 
 class DQN(nn.Module):
-    def __init__(self, in_channels=1, num_actions=8, hidden_dim=128):
+    def __init__(self, in_channels=1, num_actions=6, hidden_dim=128):
         super(DQN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 84, kernel_size=4, stride=4)
-        self.conv2 = nn.Conv2d(84, 42, kernel_size=4, stride=2)
-        self.conv3 = nn.Conv2d(42, 21, kernel_size=2, stride=2)
-        self.fc4 = nn.Linear(588, 168)
+        self.conv1 = nn.Conv3d(in_channels, 84, kernel_size=3, stride=4)
+        self.conv2 = nn.Conv3d(84, 42, kernel_size=1, stride=2)
+        self.conv3 = nn.Conv3d(42, 21, kernel_size=1, stride=2)
+        self.fc4 = nn.Linear(756, 168)
         self.lstm = nn.LSTM(168, hidden_dim, batch_first=True)
         self.hidden_size = hidden_dim
         self.attention = Attention(hidden_dim)
         self.fc5 = nn.Linear(hidden_dim, num_actions)
 
     def forward(self, x):
-        batch_size, seq_len, c, h = x.size() 
-       # x = x.view(batch_size * seq_len, c, h, w) 
+
+        batch_size, seq_len, c, h, w = x.size() 
+        #x = x.view(batch_size * seq_len, c, h, w) 
         
         x1 = F.relu(self.conv1(x))
         x2 = F.relu(self.conv2(x1))
@@ -90,8 +91,8 @@ class DDQN_Agent:
         self.network_update_interval = 100
         self.episode = -1
         self.steps_done = 0
-        self.max_steps = 400
-
+        self.max_steps = 500
+        self.total_steps = 0
         self.policy = DQN()#DQN is reinforcement NN
         self.target = DQN()
         self.test_network = DQN()
@@ -122,7 +123,7 @@ class DDQN_Agent:
             self.test_network = self.test_network.to(device)  # to use GPU
 
         # model backup
-        files = glob.glob(self.save_dir + '\\*.pt')
+        files = glob.glob(self.save_dir + '/*.pt')
         if len(files) > 0:
             files.sort(key=os.path.getmtime)
             file = files[-1]
@@ -218,8 +219,7 @@ class DDQN_Agent:
         # update priority
         for i in range(self.batch_size):
             idx = idxs[i]
-        self.test_network.load_state_dict(self.target.state_dict())
-        self.memory.update(idx, errors[i])
+            self.memory.update(idx, errors[i])
 
         loss = F.smooth_l1_loss(current_q.squeeze(), expected_q.squeeze())
         self.optimizer.zero_grad()
@@ -228,8 +228,8 @@ class DDQN_Agent:
 
     def train(self):
         print("Starting...")
-        self.test()
-        print("\n\n\n\n\nDone test\n\n\n\n\n\n\n\n")
+        #self.test()
+        #print("\n\n\n\n\nDone test\n\n\n\n\n\n\n\n")
         score_history = []
         reward_history = []
 
@@ -256,6 +256,7 @@ class DDQN_Agent:
 
                 state = next_state
                 steps += 1
+                self.total_steps += 1
                 score += reward
                 if done:
                     print("----------------------------------------------------------------------------------------")
@@ -311,7 +312,7 @@ class DDQN_Agent:
                     end = time.time()
                     stopWatch = end - start
                     print("Episode is done, episode time: ", stopWatch)
-
+                    print(f"Total Steps so Far: {self.total_steps}")
                     if self.episode % self.test_interval == 0:
                         print("Starting Test\n\n\n\n\n\n\n")
                         self.test()
@@ -320,9 +321,9 @@ class DDQN_Agent:
         writer.close()
 
     def test(self):
-        #self.test_network.load_state_dict(self.target.state_dict())
+        self.test_network.load_state_dict(self.target.state_dict())
 
-        self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE1180.pt')['state_dict'])
+        #self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE1180.pt')['state_dict'])
         start = time.time()
         steps = 0
         score = 0

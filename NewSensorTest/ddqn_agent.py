@@ -43,13 +43,14 @@ class DQN(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, 84, kernel_size=4, stride=4)
         self.conv2 = nn.Conv2d(84, 42, kernel_size=4, stride=2)
         self.conv3 = nn.Conv2d(42, 21, kernel_size=2, stride=2)
-        self.fc4 = nn.Linear(588, 168)
+        self.fc4 = nn.Linear(336, 168)
         self.lstm = nn.LSTM(168, hidden_dim, batch_first=True)
         self.hidden_size = hidden_dim
         self.attention = Attention(hidden_dim)
         self.fc5 = nn.Linear(hidden_dim, num_actions)
 
     def forward(self, x):
+        print(f"Shape : {x.shape}")
         batch_size, seq_len, c, h = x.size() 
        # x = x.view(batch_size * seq_len, c, h, w) 
         
@@ -99,7 +100,7 @@ class DDQN_Agent:
         self.test_network.eval()
         self.updateNetworks()
 
-        self.env = DroneEnv(useDepth, useLidar=True)
+        self.env = DroneEnv(useDepth, useLidar=False)
         self.optimizer = optim.Adam(self.policy.parameters(), self.learning_rate)
 
         if torch.cuda.is_available():
@@ -218,8 +219,7 @@ class DDQN_Agent:
         # update priority
         for i in range(self.batch_size):
             idx = idxs[i]
-        self.test_network.load_state_dict(self.target.state_dict())
-        self.memory.update(idx, errors[i])
+            self.memory.update(idx, errors[i])
 
         loss = F.smooth_l1_loss(current_q.squeeze(), expected_q.squeeze())
         self.optimizer.zero_grad()
@@ -322,7 +322,7 @@ class DDQN_Agent:
     def test(self):
         #self.test_network.load_state_dict(self.target.state_dict())
 
-        self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE1180.pt')['state_dict'])
+        self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE2410.pt')['state_dict'])
         start = time.time()
         steps = 0
         score = 0

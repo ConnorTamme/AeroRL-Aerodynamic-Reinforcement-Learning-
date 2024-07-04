@@ -1,0 +1,6 @@
+episode:1, reward: 1.5422131536970474, mean reward: 98073.75, score: 39327574.56778667, epsilon: 0.8877080768557865, total steps: 438
+episode:2, reward: -100, mean reward: 6554941.13, score: 39329646.7961628, epsilon: 0.8875405519934599, total steps: 444
+episode:3, reward: -100, mean reward: 6554935.04, score: 39329610.23287508, epsilon: 0.8873730606327557, total steps: 450
+episode:4, reward: 2.6596027111769005, mean reward: 98075.93, score: 39328447.93962629, epsilon: 0.8762546476570374, total steps: 851
+episode:5, reward: -100, mean reward: 3025355.56, score: 39329622.28682538, epsilon: 0.8758966815413127, total steps: 864
+episode:6, reward: -100, mean reward: 7865927.81, score: 39329639.05685789, epsilon: 0.8757590435645392, total steps: 869

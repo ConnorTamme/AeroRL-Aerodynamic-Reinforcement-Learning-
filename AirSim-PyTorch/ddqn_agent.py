@@ -201,11 +201,7 @@ class DDQN_Agent:
 
     def train(self):
         print("Starting...")
-<<<<<<< HEAD
-        self.test()
-=======
         #self.test()
->>>>>>> 6dd2c42849f8be42072526574587972fdc110a13
         score_history = []
         reward_history = []
 
@@ -295,15 +291,10 @@ class DDQN_Agent:
         writer.close()
 
     def test(self):
-<<<<<<< HEAD
-        #self.test_network.load_state_dict(self.target.state_dict())
 
-        self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE9952.pt')['state_dict'])
-=======
         self.test_network.load_state_dict(self.target.state_dict())
 
         #self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE258.pt')['state_dict'])
->>>>>>> 6dd2c42849f8be42072526574587972fdc110a13
         start = time.time()
         steps = 0
         score = 0
