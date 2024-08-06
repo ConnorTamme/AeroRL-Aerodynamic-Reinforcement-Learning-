@@ -1,0 +1,1 @@
+Optimizer : Adam , Learning Rate : 0.000585 , Eps_Decay : 70000 , Gamma : 0.8 , Average : -4.495911492342488

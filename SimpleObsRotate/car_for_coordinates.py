@@ -1,6 +1,27 @@
 import airsim
 import time
 
+def get_lidar(client):
+    lidarData = client.getLidarData()
+    points = np.zeros((10, 3)) #3*15 gives room for num_rows * 15 lidar data points
+    bundledLidar = []
+    for i in range(0,len(lidarData.point_cloud),3):
+        bundledLidar.append([lidarData.point_cloud[i],lidarData.point_cloud[i+1],lidarData.point_cloud[i+2]])
+    lidarPos = np.array([lidarData.pose.position.x_val, lidarData.pose.position.y_val, lidarData.pose.position.z_val])
+    heap = Heap(bundledLidar, self.compare_lidar_points)
+    done = 0
+    for i in range(0,10):
+        if ((i*3) >= len(bundledLidar)):
+            done = 1
+            break
+        pt = heap.Pop()
+        points[i][0] = pt[0]
+        points[i][1] = pt[1]
+        points[i][2] = pt[2]
+
+        if done == 1:
+            break
+    return points
 class XYZ_data():
     def __init__(self, x_val, y_val, z_val):
         self.x_val = x_val
@@ -37,6 +58,7 @@ while(True):
     time.sleep(0.1)
     if (loops % 50 == 0):
         gps_data = client.getMultirotorState().gps_location
+        print(get_lidar(client, ))
         quad_state = XYZ_data(gps_data.latitude, gps_data.longitude, gps_data.altitude)
         print(quad_state.toString())
     loops += 1

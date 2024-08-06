@@ -86,6 +86,8 @@ class DroneEnv(object):
         self.image_width = 84
         self.image_channels = 3
         self.image_size = self.image_height * self.image_width * self.image_channels
+        self.checkpointsSoFar = 0
+        self.orientsSoFar = 0
 
     def step(self, action):
         """Step"""
@@ -135,6 +137,8 @@ class DroneEnv(object):
         self.client.moveByVelocityBodyFrameAsync(0, 0, -7, 2).join()
         self.pastDist = np.zeros(50)
         self.running_reward = 0
+        self.checkpointsSoFar = 0
+        self.orientsSoFar = 0
         obs, image = self.get_obs(quad_state)
         
         return obs, image
@@ -229,6 +233,8 @@ class DroneEnv(object):
         done = 0
         reward = 0
 
+        ori = self.client.getImuData().orientation
+        ori = euler_from_quaternion(ori.x_val, ori.y_val, ori.z_val, ori.w_val)
         if collision:
             reward -= 100  # Penalty for collision
             done = 1
@@ -238,9 +244,6 @@ class DroneEnv(object):
             #dist = np.linalg.norm(np.array(quad_state.toList()) - np.array(goal)
             diff = self.last_dist - dist
 
-            ori = self.client.getImuData().orientation
-        
-            ori = euler_from_quaternion(ori.x_val, ori.y_val, ori.z_val, ori.w_val)
             angle = self.angle_to_dest()
 
             if ori[2] > angle:
@@ -251,6 +254,8 @@ class DroneEnv(object):
                 angDiff = 360 - angDiff
 
             if angDiff < 5 or dist < 1:
+                if self.orientsSoFar < self.checkpointsSoFar:
+                    self.orientsSoFar += 1
             # Dynamic scaling of rewards and penalties based on proximity to goal
                 scale_factor = 10 if dist > 5 else 50 if dist > 1 else 100
         
@@ -262,12 +267,13 @@ class DroneEnv(object):
                     reward += diff * scale_factor / 2  # Penalize for increasing distance
 
                 # Reward for being very close to the destination
-                if dist < 5:
-                    reward += 500  
+                #if dist < 5:
+                #    reward += 500  
 
                 # Reward for reaching the goal
                 if dist < 1:
-                    reward += 1000  
+                    reward += 100  
+                    self.checkpointsSoFar += 1
                     newDest = self.dest
                     while newDest == self.dest:
                         newDest = DESTS[r.randrange(0,len(DESTS))]
@@ -276,7 +282,7 @@ class DroneEnv(object):
                 else:
                     self.last_dist = dist
             else:
-                reward -= angDiff/10
+                reward -= angDiff/15
                 self.last_dist = dist
             print(f"Angle Diff: {angDiff}")
             # Penalize proximity to obstacles
@@ -298,12 +304,15 @@ class DroneEnv(object):
             self.last_vel = vel_array
             self.prevAngle = np.array(ori)
             print(f"Dist Diff : {diff}\nLast Angle : {self.prevAngle}\nCurr Angle : {ori}")
-        if (((self.last_pos - np.array(quad_state.toList())) == np.zeros(3)).all() and (np.array(ori) - self.prevAngle == np.zeroes(3)).all()):
+        if (((self.last_pos - np.array(quad_state.toList())) == np.zeros(3)).all() and (np.array(ori) - self.prevAngle == np.zeros(3)).all()):
             done = 1
             reward -= 100
         self.running_reward += reward
         if self.running_reward < -200:
             done = 1
+        if done == 1:
+            reward += 10 * self.orientsSoFar
+            reward += 30 * self.checkpointsSoFar
         self.last_pos = np.array(quad_state.toList())
         print(f"Reward: {reward}")
         print(f"Reward so Far: {self.running_reward}")

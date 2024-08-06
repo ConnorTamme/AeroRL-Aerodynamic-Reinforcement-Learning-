@@ -82,16 +82,16 @@ class DDQN_Agent:
         self.eps_decay = 30000
         self.gamma = 0.8#gamma is how much future rewards matter. Low gamma is impulsive
                          #high gamma (closer to 1) will delay rewards now for bigger rewards later
-        self.learning_rate = 0.001
+        self.learning_rate = 0.0005
         self.batch_size = 128
         self.memory = Memory(10000)
-        self.max_episodes = 10000
+        self.max_episodes = 15000
         self.save_interval = 10
         self.test_interval = 20
         self.network_update_interval = 100
         self.episode = -1
         self.steps_done = 0
-        self.max_steps = 500
+        self.max_steps = 800
         self.total_steps = 0
         self.policy = DQN()#DQN is reinforcement NN
         self.target = DQN()
@@ -323,7 +323,7 @@ class DDQN_Agent:
     def test(self):
         self.test_network.load_state_dict(self.target.state_dict())
 
-        #self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE1180.pt')['state_dict'])
+        #self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE8890.pt')['state_dict'])
         start = time.time()
         steps = 0
         score = 0

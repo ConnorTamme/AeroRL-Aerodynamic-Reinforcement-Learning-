@@ -63,6 +63,8 @@ class DroneEnv(object):
         self.client = airsim.MultirotorClient() #gets the airsim client
         self.dest = DESTS[r.randrange(0, len(DESTS))]
         gps_data = self.client.getMultirotorState().gps_location
+        self.last_angle = 0
+        self.traversed = 0
         self.last_dist = self.get_distance(XYZ_data(gps_data.latitude, gps_data.longitude, gps_data.altitude))
     #The multirotor state looks like this:
     #can_arm = False
@@ -81,11 +83,13 @@ class DroneEnv(object):
         self.pastDist = np.zeros(50)
         self.last_pos = np.zeros(3)
         self.useLidar = useLidar
-        
+        self.prevAngle = np.array([500,500,500])
         self.image_height = 84
         self.image_width = 84
         self.image_channels = 3
         self.image_size = self.image_height * self.image_width * self.image_channels
+        self.checkpointsSoFar = 0
+        self.orientsSoFar = 0
 
     def step(self, action):
         """Step"""
@@ -112,15 +116,18 @@ class DroneEnv(object):
             #if drone is too low after step it climbs
         
         result, done = self.compute_reward(quad_state, quad_vel, collision, 0,self.dest, 0)
-        state, image = self.get_obs(quad_state)
+        state = self.get_obs(quad_state)
 
-        return state, result, done, image
+        return state, result, done
 
     def reset(self):
         self.client.reset() #moves vehicle to default position
         self.startTime = time.time()
+        self.prevAngle = np.array([500,500,500])
         gps_data = self.client.getMultirotorState().gps_location
         self.last_dist = 0
+        self.last_angle = 0
+        self.traversed = 0
         self.client.enableApiControl(True)
         self.client.armDisarm(True)
         self.client.takeoffAsync().join()
@@ -134,9 +141,11 @@ class DroneEnv(object):
         self.client.moveByVelocityBodyFrameAsync(0, 0, -7, 2).join()
         self.pastDist = np.zeros(50)
         self.running_reward = 0
-        obs, image = self.get_obs(quad_state)
+        self.checkpointsSoFar = 0
+        self.orientsSoFar = 0
+        obs = self.get_obs(quad_state)
         
-        return obs, image
+        return obs
 
     def get_obs(self, quad_state):
         coordinate_part = np.zeros((3,3))
@@ -154,14 +163,14 @@ class DroneEnv(object):
         ori = euler_from_quaternion(ori.x_val, ori.y_val, ori.z_val, ori.w_val)
         coordinate_part[2][0] = ori[2]
         coordinate_part[2][1] = self.angle_to_dest()
-        obs = np.concatenate((obs, coordinate_part), axis=0)
+        obs = coordinate_part
         if self.useLidar:
             obs = np.concatenate((obs, self.get_lidar(np.size(obs,0))), axis=1)
-        return obs, image
+        return obs
 
     def get_lidar(self, num_rows):
         lidarData = self.client.getLidarData()
-        points = np.zeros((10,3)) #3*15 gives room for num_rows * 15 lidar data points
+        points = np.zeros((5,num_rows,3)) #3*15 gives room for num_rows * 15 lidar data points
         bundledLidar = []
         for i in range(0,len(lidarData.point_cloud),3):
             bundledLidar.append([lidarData.point_cloud[i],lidarData.point_cloud[i+1],lidarData.point_cloud[i+2]])
@@ -169,14 +178,15 @@ class DroneEnv(object):
         heap = Heap(bundledLidar, self.compare_lidar_points)
         
         done = 0
-        for i in range(0,10):
-            if (i >= len(bundledLidar)):
-                done = 1
-                break
-            pt = heap.Pop()
-            points[i][0] = pt[0]
-            points[i][1] = pt[1]
-            points[i][2] = pt[2]
+        for i in range(0,5):
+            for j in range(0,num_rows):
+                if ((i*84)+j >= len(bundledLidar)):
+                    done = 1
+                    break
+                pt = heap.Pop()
+                points[i][j][0] = pt[0]
+                points[i][j][1] = pt[1]
+                points[i][j][2] = pt[2]
 
             if done == 1:
                 break
@@ -216,6 +226,8 @@ class DroneEnv(object):
         done = 0
         reward = 0
 
+        ori = self.client.getImuData().orientation
+        ori = euler_from_quaternion(ori.x_val, ori.y_val, ori.z_val, ori.w_val)
         if collision:
             reward -= 100  # Penalty for collision
             done = 1
@@ -225,22 +237,23 @@ class DroneEnv(object):
             #dist = np.linalg.norm(np.array(quad_state.toList()) - np.array(goal)
             diff = self.last_dist - dist
 
-            ori = self.client.getImuData().orientation
-        
-            ori = euler_from_quaternion(ori.x_val, ori.y_val, ori.z_val, ori.w_val)
             angle = self.angle_to_dest()
 
             if ori[2] > angle:
-                diff = ori[2] - angle
+                angDiff = ori[2] - angle
             else:
-                diff = angle - ori[2]
-            if diff > 180:
-                diff = 360 - diff
+                angDiff = angle - ori[2]
+            if angDiff > 180:
+                angDiff = 360 - angDiff
 
-            if diff < 3:
+            #Unless at destination only give rewards for travelling if facing right way
+            if angDiff < 5 or dist < 1:
+                if self.orientsSoFar < self.checkpointsSoFar:
+                    self.orientsSoFar += 1
             # Dynamic scaling of rewards and penalties based on proximity to goal
                 scale_factor = 10 if dist > 5 else 50 if dist > 1 else 100
-        
+                if (diff > 0):
+                    self.traversed += diff
                 if self.last_dist != 0:
                     reward += diff * scale_factor  # Reward for getting closer
     
@@ -249,12 +262,13 @@ class DroneEnv(object):
                     reward += diff * scale_factor / 2  # Penalize for increasing distance
 
                 # Reward for being very close to the destination
-                if dist < 5:
-                    reward += 500  
+                #if dist < 5:
+                #    reward += 500  
 
                 # Reward for reaching the goal
                 if dist < 1:
-                    reward += 1000  
+                    reward += 100  
+                    self.checkpointsSoFar += 1
                     newDest = self.dest
                     while newDest == self.dest:
                         newDest = DESTS[r.randrange(0,len(DESTS))]
@@ -263,8 +277,13 @@ class DroneEnv(object):
                 else:
                     self.last_dist = dist
             else:
-                reward -= diff/10
-            print(f"Angle Diff: {diff}")
+                reward -= angDiff/15
+                if (self.last_angle != 0):
+                    reward += (self.last_angle - angDiff) #Give small reward for adjusting in the right direction
+                self.last_dist = dist
+            print(f"Orientation Towards Goal : {self.last_angle - angDiff}")
+            self.last_angle = angDiff
+            print(f"Angle Diff: {angDiff}")
             # Penalize proximity to obstacles
             #min_dist_to_obstacles = min(np.linalg.norm(np.array(quad_state) - np.array(obs)) for obs in obstacles)
             #if min_dist_to_obstacles < 2:  
@@ -282,12 +301,22 @@ class DroneEnv(object):
             if np.linalg.norm(self.last_vel - vel_array) > 1:
                 reward -= 10 
             self.last_vel = vel_array
-        if (((self.last_pos - np.array(quad_state.toList())) == np.zeros(3)).all()):
+            self.prevAngle = np.array(ori)
+            print(f"Dist Diff : {diff}\nLast Angle : {self.prevAngle}\nCurr Angle : {ori}")
+
+        if (((self.last_pos - np.array(quad_state.toList())) == np.zeros(3)).all() and (np.array(ori) - self.prevAngle == np.zeros(3)).all()):
             done = 1
             reward -= 100
         self.running_reward += reward
+
         if self.running_reward < -200:
             done = 1
+
+        #Give rewards for success over the entire run
+        if done == 1:
+            reward += 10 * self.orientsSoFar
+            reward += 30 * self.checkpointsSoFar
+            reward += self.traversed
         self.last_pos = np.array(quad_state.toList())
         print(f"Reward: {reward}")
         print(f"Reward so Far: {self.running_reward}")
@@ -303,10 +332,10 @@ class DroneEnv(object):
             self.quad_offset = (-scaling_factor, 0, 0)
         elif action == 2:
             self.quad_offset = (0, 0, 0)
-            self.client.rotateByYawRateAsync(10,1).join()
+            self.client.rotateByYawRateAsync(7,1).join()
         elif action == 3:
             self.quad_offset = (0, 0, 0)
-            self.client.rotateByYawRateAsync(-10,1).join()
+            self.client.rotateByYawRateAsync(-7,1).join()
         elif action == 4:
             self.quad_offset = (0,0,scaling_factor)
         elif action == 5:

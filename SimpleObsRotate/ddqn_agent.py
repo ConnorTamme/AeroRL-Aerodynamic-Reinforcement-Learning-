@@ -40,10 +40,10 @@ class Attention(nn.Module):
 class DQN(nn.Module):
     def __init__(self, in_channels=1, num_actions=6, hidden_dim=128):
         super(DQN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 84, kernel_size=3, stride=4)
-        self.conv2 = nn.Conv2d(84, 42, kernel_size=1, stride=2)
-        self.conv3 = nn.Conv2d(42, 21, kernel_size=1, stride=2)
-        self.fc4 = nn.Linear(756, 168)
+        self.conv1 = nn.Conv2d(in_channels, 84, kernel_size=3, stride=3)
+        self.conv2 = nn.Conv2d(84, 42, kernel_size=1, stride=1)
+        self.conv3 = nn.Conv2d(42, 21, kernel_size=1, stride=1)
+        self.fc4 = nn.Linear(21, 168)
         self.lstm = nn.LSTM(168, hidden_dim, batch_first=True)
         self.hidden_size = hidden_dim
         self.attention = Attention(hidden_dim)
@@ -79,19 +79,19 @@ class DDQN_Agent:
         self.eps_start = 0.9#epsilon is the probability of taking a random action.
                              #epsilon decays overtime and bottoms out at 0.05 or 5%
         self.eps_end = 0.05
-        self.eps_decay = 30000
+        self.eps_decay = 70000
         self.gamma = 0.8#gamma is how much future rewards matter. Low gamma is impulsive
                          #high gamma (closer to 1) will delay rewards now for bigger rewards later
-        self.learning_rate = 0.001
+        self.learning_rate = 0.0005
         self.batch_size = 128
         self.memory = Memory(10000)
-        self.max_episodes = 10000
+        self.max_episodes = 15000
         self.save_interval = 10
         self.test_interval = 20
         self.network_update_interval = 100
         self.episode = -1
         self.steps_done = 0
-        self.max_steps = 500
+        self.max_steps = 1000
         self.total_steps = 0
         self.policy = DQN()#DQN is reinforcement NN
         self.target = DQN()
@@ -100,7 +100,7 @@ class DDQN_Agent:
         self.test_network.eval()
         self.updateNetworks()
 
-        self.env = DroneEnv(useDepth, useLidar=True)
+        self.env = DroneEnv(useDepth, useLidar=False)
         self.optimizer = optim.Adam(self.policy.parameters(), self.learning_rate)
 
         if torch.cuda.is_available():
@@ -123,7 +123,7 @@ class DDQN_Agent:
             self.test_network = self.test_network.to(device)  # to use GPU
 
         # model backup
-        files = glob.glob(self.save_dir + '\\*.pt')
+        files = glob.glob(self.save_dir + '/*.pt')
         if len(files) > 0:
             files.sort(key=os.path.getmtime)
             file = files[-1]
@@ -147,7 +147,7 @@ class DDQN_Agent:
                 open('saved_model_params.txt', 'w').close()
 
         self.optimizer = optim.Adam(self.policy.parameters(), self.learning_rate)
-        obs, _ = self.env.reset()
+        obs = self.env.reset()
         tensor = self.transformToTensor(obs)
         writer.add_graph(self.policy, tensor)
 
@@ -238,14 +238,14 @@ class DDQN_Agent:
 
         for e in range(1, self.max_episodes + 1):
             start = time.time()
-            state, _ = self.env.reset()
+            state = self.env.reset()
             steps = 0
             score = 0
             while True:
                 state = self.transformToTensor(state)
 
                 action = self.act(state)
-                next_state, reward, done, _ = self.env.step(action)
+                next_state, reward, done = self.env.step(action)
 
                 if steps == self.max_steps:
                     done = 1
@@ -323,20 +323,17 @@ class DDQN_Agent:
     def test(self):
         self.test_network.load_state_dict(self.target.state_dict())
 
-        #self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE1180.pt')['state_dict'])
+        #self.test_network.load_state_dict(torch.load(self.save_dir + '/EPISODE8890.pt')['state_dict'])
         start = time.time()
         steps = 0
         score = 0
-        image_array = []
-        state, next_state_image = self.env.reset()
-        image_array.append(next_state_image)
+        state = self.env.reset()
 
         while True:
             state = self.transformToTensor(state)
 
             action = int(np.argmax(self.test_network(state).cpu().data.squeeze().numpy()))
-            next_state, reward, done, next_state_image = self.env.step(action)
-            image_array.append(next_state_image)
+            next_state, reward, done = self.env.step(action)
 
             if steps == self.max_steps:
                 done = 1

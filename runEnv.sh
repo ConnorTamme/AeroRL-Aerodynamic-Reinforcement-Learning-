@@ -1,1 +1,1 @@
-./AirSimNH/LinuxNoEditor/AirSimNH.sh
+MESA_VK_DEVICE_SELECT=10005:0 ./AirSimNH/LinuxNoEditor/AirSimNH.sh

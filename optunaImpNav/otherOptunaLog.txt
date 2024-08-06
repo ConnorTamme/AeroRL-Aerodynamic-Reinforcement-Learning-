@@ -1,0 +1,10 @@
+Optimizer : Adam , Learning Rate : 0.00010195697446369775 , Eps_Decay : 71361 , Gamma : 0.8 , Average : -2.5563327265950964
+Optimizer : Adam , Learning Rate : 5.86796425156586e-05 , Eps_Decay : 73936 , Gamma : 0.8 , Average : -1.8476736976187627
+Optimizer : Adam , Learning Rate : 0.000164837873142404 , Eps_Decay : 70159 , Gamma : 0.8 , Average : -1.0020149746450755
+Optimizer : Adam , Learning Rate : 5.4019059651713554e-05 , Eps_Decay : 69165 , Gamma : 0.8 , Average : -0.6726855728397372
+Optimizer : Adam , Learning Rate : 0.0005847801047731282 , Eps_Decay : 65129 , Gamma : 0.8 , Average : -2.082246106874565
+Optimizer : Adam , Learning Rate : 1.926849653203914e-05 , Eps_Decay : 71228 , Gamma : 0.8 , Average : -5.215683917628375
+Optimizer : Adam , Learning Rate : 9.262302224451805e-05 , Eps_Decay : 74824 , Gamma : 0.8 , Average : -3.2060087835688393
+Optimizer : Adam , Learning Rate : 8.672252797211926e-05 , Eps_Decay : 74183 , Gamma : 0.8 , Average : -1.7106819808705773
+Optimizer : Adam , Learning Rate : 1.2173395751679296e-05 , Eps_Decay : 64359 , Gamma : 0.8 , Average : -6.368001769709719
+Optimizer : Adam , Learning Rate : 0.00023306911001592888 , Eps_Decay : 71459 , Gamma : 0.8 , Average : -3.146779169733764
